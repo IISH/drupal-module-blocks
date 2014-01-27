@@ -1,0 +1,213 @@
+<?php
+
+/**
+ * @file
+ * Define Search and Browse blocks for IISG website.
+ */
+
+function iish_blocks_block_info() {
+
+  $blocks['iish_blocks_search'] = array(
+    'info' => t('Homepage search block'),
+    'status' => TRUE,
+    'region' => 'preface_first', /* theme? */
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => '<front>',
+//    'cache' => DRUPAL_CACHE_GLOBAL,
+  );
+  $blocks['iish_blocks_browse'] = array(
+    'info' => t('Homepage browse block'),
+    'status' => TRUE,
+    'region' => 'preface_second',
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => '<front>',
+//    'cache' => DRUPAL_CACHE_GLOBAL,
+  );
+  $blocks['iish_blocks_search_small'] = array(
+    'info' => t('Sidebar search block'),
+    'status' => TRUE,
+    'region' => 'sidebar_second', /* theme? */
+    'visibility' => BLOCK_VISIBILITY_NOTLISTED,
+    'pages' => '<front>',
+//    'cache' => DRUPAL_CACHE_GLOBAL,
+  );
+  $blocks['iish_blocks_browse_small'] = array(
+    'info' => t('Sidebar browse block'),
+    'status' => TRUE,
+    'region' => 'sidebar_second',
+    'visibility' => BLOCK_VISIBILITY_NOTLISTED,
+    'pages' => '<front>',
+//    'cache' => DRUPAL_CACHE_GLOBAL,
+  );
+
+  return $blocks;
+}
+
+function iish_blocks_block_view($delta = '') {
+  switch ($delta) {
+    case 'iish_blocks_search':
+    case 'iish_blocks_search_small':
+      $block['subject'] = t('Search website');
+      $block['content'] = iish_blocks_contents($delta);
+      break;
+    case 'iish_blocks_browse':
+    case 'iish_blocks_browse_small':
+      $block['subject'] = t('Browse website');
+      $block['content'] = iish_blocks_contents($delta);
+      break;
+  }
+  return $block;
+}
+
+function iish_blocks_contents($delta) {
+  $output = '';
+  $collections = t('collections');
+  $research = t('research');
+  $catalogue = t('catalogue');
+  $about = t('about iisg');
+  switch ($delta) {
+    case 'iish_blocks_search':
+      $output .= '<div class="iish-block-search">';
+      $output .= "<ul><li>$collections</li><li>$research</li><li>$about</li></ul>";
+      $output .= drupal_render(drupal_get_form('search_block_form'));
+      $output .= _iish_blocks_search_catalogue();
+      $output .= '</div>';
+      break;
+
+    case 'iish_blocks_search_small':
+      $output .= '<div class="iish-block-search">';
+      $output .= drupal_render(drupal_get_form('search_block_form'));
+      ##$output .= _iish_blocks_search_catalogue();
+      $output .= '</div>';
+      break;
+
+    case 'iish_blocks_browse':
+      $output .= '<div class="iish-block-browse">';
+      $output .= "<ul><li>$collections</li><li>$research</li></ul>";
+      $output .= '<ul class="browse-menu">';
+      $output .= iish_blocks_browse_menu('countries', 'hierarchical');
+      $output .= iish_blocks_browse_menu('themes', 'flat');
+      $output .= '</ul>';
+      $output .= '</div>';
+      break;
+
+    case 'iish_blocks_browse_small':
+      $output .= '<div class="iish-block-browse">';
+      $output .= '<ul class="browse-menu">';
+      $output .= iish_blocks_browse_menu('countries', 'hierarchical');
+      $output .= iish_blocks_browse_menu('themes', 'flat');
+      $output .= '</ul>';
+      $output .= '</div>';
+      break;
+  }
+  return $output;
+}
+
+function iish_blocks_browse_menu($name, $type) {
+  drupal_add_css(drupal_get_path('module', 'iish_blocks') . '/browse_menu.css');
+  drupal_add_js(drupal_get_path('module', 'iish_blocks') . '/browse_menu.js'); 
+  $output  = '<li class="browse-leaf"><span class="browse-link" >';
+  $output .= t($name);
+  $output .= '</span><div class="browse-menu-content closed">';
+  $output .= iish_blocks_vocabulary($name, $type);
+  $output .= '</div></li>';
+  return $output;
+}
+
+function iish_blocks_vocabulary($name, $type) {
+  // $url = 'taxonomy/term/';
+  $url = 'browse/all';  // This view accepts a tid argument.
+  $vocab = taxonomy_vocabulary_machine_name_load($name);
+  $terms = taxonomy_get_tree($vocab->vid);
+  if (module_exists('i18n_taxonomy')) {
+    $terms = i18n_taxonomy_localize_terms($terms);
+  }
+  $term_count = count($terms);
+
+  if ($type == 'flat') {
+    // A flat taxonomy, divide in columns.
+    $param = 'tid_1[]';
+    $columns = 5;
+    $rows = ceil($term_count / $columns);
+    $content = '<ul class="browse-list ' . $name . '"><li><ul class="browse-col">';
+    for ($i = 0; $i < $term_count; $i++) {
+      $term_link = l(t($terms[$i]->name), $url, array('query' => array($param => $terms[$i]->tid)));
+      if (($i % $rows == 0) && ($i != 0)) {
+        // Start a new column.
+        $content .= '</ul></li><li><ul class="browse-col">';
+      }
+      $content .= '<li>' . $term_link . '</li>';
+    }
+    $content .= '</ul></li></ul>';
+  }
+  else {
+    // A hierarchical taxonomy. Use hierarchy for columns.
+    $param = 'tid[]';
+    $content = '<ul class="browse-list ' . $name . '">';
+    for ($i = 0; $i < $term_count; $i++) {
+      $term_link = l(t($terms[$i]->name), $url, array('query' => array($param => $terms[$i]->tid)));
+      if ($i == 0) {
+        $content .= '<li class="level-0">' . $term_link;
+      }
+      else {
+        if ($terms[$i]->depth == $depth) {
+          $content .= '</li>';
+        }
+        elseif ($terms[$i]->depth > $depth) { 
+          $content .= '<ul>';
+        }
+        elseif ($terms[$i]->depth < $depth) {
+          // Add missing end-tags depending of depth level difference.
+          for ($j = $terms[$i]->depth; $j < $depth; $j++) {
+            $content .= '</li></ul>';
+          }
+          $content .= '</li>';
+        }
+        if ($terms[$i]->depth == 0) {
+          $content .= '<li class="level-0">' . $term_link;
+        }
+        else {
+          $content .= '<li>' . $term_link;
+        }
+        // If we have reached the last element add all possibly missing end-tags.
+        if (!isset($terms[$i+1])) {
+          for ($j = 0; $j < $terms[$i]->depth; $j++) {
+            $content .= '</li></ul>';
+          }
+        }
+      }
+      $depth = $terms[$i]->depth;
+    }
+    $content .= '</li></ul>';
+  }
+
+  return $content;
+}
+
+
+function _iish_blocks_search_catalogue() {
+  $out = '<div class="search-catalogue"><span id="catalogue">></span><a href="http://search.socialhistory.org">access the catalogue</a></div>';
+  return $out;
+}
+
+
+function iish_blocks_menu_breadcrumb_alter(&$active_trail, $item) {
+  // Always display a link to the current page by duplicating the last link in
+  // the active trail. This means that menu_get_active_breadcrumb() will remove
+  // the last link (for the current page), but since it is added once more here,
+  // it will appear.
+  if (!drupal_is_front_page()) {
+    $end = end($active_trail);
+    if ($item['href'] == $end['href']) {
+      $active_trail[] = $end;
+    }
+  } else {
+		// werkt niet, zie menu_get_active_breadcrumb()
+    $active_trail[] = array('href' => '<front>', 'title' => t('IISH'));
+	}
+  // Replace "Home" with "IISH".
+//	if ($active_trail[0]['href'] == '<front>') { 
+//		$active_trail[0]['title'] = t('IISH'); 
+//	}
+}
+

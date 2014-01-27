@@ -1,0 +1,8 @@
+name = IISH Custom Blocks
+description = Search and Browse blocks
+core = 7.x
+dependencies[] = block
+dependencies[] = search
+dependencies[] = taxonomy
+version = "7.x-1.0"
+
